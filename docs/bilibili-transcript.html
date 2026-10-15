@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bilibili-transcript — 提取 B 站文字稿</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .term {
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    margin: 0 0 16px; background: var(--code-bg);
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 9px 13px; border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .term-bar i {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--line); display: block;
+  }
+  .term-bar i:first-child { background: var(--accent); }
+  .term-bar span {
+    margin-left: 6px; font-size: 12.5px; color: var(--dim);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .term pre {
+    margin: 0; border: none; border-radius: 0; background: none;
+    padding: 13px 15px; font-size: 12.5px; line-height: 1.6;
+  }
+  .term .ps { color: var(--accent); font-weight: 600; }
+  .term .out { color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>把 B 站视频<br>变成<span class="mark">能读的文字</span></h1>
+  <p class="lede">字幕、文字稿、AI 总结，一条命令拿走。</p>
+  <p class="lede">技能自带脚本 · 零 npm 依赖 · 扫码登录</p>
+</header>
+
+<div class="install">
+<pre><code><span class="k">npx</span> skills@latest add dongliang/skills --skill bilibili-transcript</code></pre>
+<p class="dim" style="font-size:14px">装完即用，脚本随技能一起来，不需要再装别的东西。</p>
+</div>
+
+<h2>跑起来是这样</h2>
+<div class="term">
+  <div class="term-bar"><i></i><i></i><i></i><span>bilibili-transcript</span></div>
+<pre><span class="ps">$</span> node src/cli.mjs "https://b23.tv/xxxxx" --plain
+<span class="out"># 装上它，AI 编程通过率从 6.7% 涨到 96.7%
+UP: 某 UP 主 | 时长 1159s
+
+## 字幕：中文（462 条）
+
+2025年有一款AI agent让全世界都吃了一惊
+他发布几个小时服务器就被挤爆
+...</span>
+<span class="ps">$</span> node src/cli.mjs BV1xx411c7mD --plain -o out.txt
+<span class="out">已写入 out.txt（5618 字符）</span></pre>
+</div>
+
+<h2>它能做什么</h2>
+<ul>
+  <li>把任意 B 站视频的字幕扒成文字，带不带时间戳都行</li>
+  <li>拿 B 站官方的 AI 视频总结，带章节和时间点</li>
+  <li>BV 号、av 号、完整链接、b23.tv 短链都认</li>
+  <li>合集视频可以只取某一集（分P）</li>
+  <li>给 agent 用的 <code>--json</code> 结构化输出</li>
+</ul>
+
+<h2>三步开始</h2>
+<pre><code><span class="c"># 1. 登一次，以后不用再登（扫码）</span>
+node src/cli.mjs login
+
+<span class="c"># 2. 提取文字稿</span>
+node src/cli.mjs BV1xx411c7mD --plain
+
+<span class="c"># 3. 长视频写进文件再看</span>
+node src/cli.mjs "https://b23.tv/xxxxx" --plain -o out.txt</code></pre>
+<p class="dim">出问题了先跑 <code>node src/cli.mjs doctor</code>，它分得清是接口变了、凭据过期了还是环境有问题。</p>
+
+<h2>命令一览</h2>
+<table>
+  <tr><th>选项</th><th>作用</th></tr>
+  <tr><td><code>--plain</code></td><td>只出连续文字，不带时间戳</td></tr>
+  <tr><td><code>--json</code></td><td>结构化输出，给程序用</td></tr>
+  <tr><td><code>-p N</code></td><td>取第 N 个分P</td></tr>
+  <tr><td><code>--list</code></td><td>只列字幕轨，不下正文</td></tr>
+  <tr><td><code>--summary</code></td><td>附带 B 站 AI 总结</td></tr>
+  <tr><td><code>-o FILE</code></td><td>写入文件</td></tr>
+</table>
+
+<h2>已知限制</h2>
+<ul>
+  <li>字幕接口强制登录，必须先扫码一次</li>
+  <li>字幕是 AI 自动生成的，专有名词常出错，别直接信</li>
+  <li>纯音乐、MV、CG 类视频通常没有字幕轨</li>
+</ul>
+
+<footer>
+  <a href="index.html">← 全部技能</a>
+  <a href="https://github.com/dongliang/skills">GitHub</a>
+  <a href="https://www.npmjs.com/package/bili-transcript">npm</a>
+</footer>
+
+</div>
+</body>
+</html>

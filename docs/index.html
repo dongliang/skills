@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent skills — dongliang</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>我自己在用的<br><span class="mark">agent skills</span></h1>
+  <p class="lede">遵循 <a href="https://agentskills.io/specification">Agent Skills 规范</a>，Claude Code、Codex、Cursor 等通用。</p>
+</header>
+
+<div class="install">
+<pre><code><span class="k">npx</span> skills@latest add dongliang/skills</code></pre>
+<p class="dim" style="font-size:14px">装到全局：<code>npx skills@latest add dongliang/skills -g</code></p>
+</div>
+
+<table>
+  <tr><th>技能</th><th>说明</th></tr>
+  <tr>
+    <td><a href="pixelfig.html">pixelfig</a></td>
+    <td>把一段中文内容画成像素图，输出真实 PNG</td>
+  </tr>
+  <tr>
+    <td><a href="bilibili-transcript.html">bili-transcript</a></td>
+    <td>提取 B 站视频的文字稿、字幕、AI 总结</td>
+  </tr>
+</table>
+
+<h2>来源</h2>
+<p class="dim">技能放在 <a href="https://github.com/dongliang/skills">GitHub</a>。改完校验格式：</p>
+<pre><code>npx -y skills-ref validate ./skills/visual/pixelfig</code></pre>
+
+<footer>
+  <a href="https://github.com/dongliang/skills">GitHub</a>
+  <a href="https://skills.sh/dongliang/skills">skills.sh</a>
+  MIT License
+</footer>
+
+</div>
+</body>
+</html>

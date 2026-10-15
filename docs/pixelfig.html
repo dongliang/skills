@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pixelfig — 把中文内容画成像素图</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>把中文内容<br>画成<span class="mark">像素图</span></h1>
+  <p class="lede">输出真实 PNG，不走 SVG。</p>
+  <p class="lede">中文排版开箱可用。</p>
+</header>
+
+<div class="install">
+<pre><code><span class="k">npx</span> skills@latest add dongliang/skills --skill pixelfig</code></pre>
+<p class="dim" style="font-size:14px">字体要单独下（约 12MB）：<code>sh scripts/install-fonts.sh</code></p>
+</div>
+
+<h2>效果</h2>
+<img class="shot" src="example.png" alt="pixelfig 输出示例">
+
+<h2>它能做什么</h2>
+<ul>
+  <li>把一段文字排成一张图：标题条、面板、色条、图标、箭头</li>
+  <li>中文用像素字体渲染，小字不糊</li>
+  <li>在一张约 290px 宽的逻辑画布上作画，输出时整数倍放大</li>
+  <li>自动按内容累加高度，不用预设画布尺寸</li>
+</ul>
+
+<h2>用法</h2>
+<pre><code><span class="c"># 装完字体后，在 Python 里直接调</span>
+<span class="k">import</span> sys; sys.path.insert(0, "scripts")
+<span class="k">from</span> pixelfig <span class="k">import</span> *
+
+c = Canvas(290, 200)
+c.bar(10, 8, 270, 18, PURPLE, label=<span class="c">"标题"</span>)
+c.panel(10, 30, 270, 60, accent=CYAN, fill=CYAN_L)
+c.text(22, 40, <span class="c">"正文"</span>, 12, INK)
+c.save(<span class="c">"out.png"</span>, scale=3)</code></pre>
+
+<h2>依赖</h2>
+<table>
+  <tr><th>用途</th><th>来源</th></tr>
+  <tr><td>图像绘制</td><td><a href="https://python-pillow.org/">Pillow</a>（<a href="https://www.python.org/">Python 3</a>）</td></tr>
+  <tr><td>中文像素字</td><td><a href="https://github.com/TakWolf/fusion-pixel-font">Fusion Pixel Font</a> · <a href="https://github.com/ACh-K/Cubic-11">Cubic 11</a>（均为 OFL-1.1）</td></tr>
+</table>
+
+<h2>已知限制</h2>
+<ul>
+  <li>中文像素字最小 12px，再小笔画会断</li>
+  <li>放大倍率只用整数，非整数倍会让像素块大小不匀</li>
+  <li>只在能读文件的 agent 里可用，纯聊天界面用不了</li>
+</ul>
+
+<footer>
+  <a href="index.html">← 全部技能</a>
+  <a href="https://github.com/dongliang/skills">GitHub</a>
+</footer>
+
+</div>
+</body>
+</html>
