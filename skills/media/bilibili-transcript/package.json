@@ -1,0 +1,45 @@
+{
+  "name": "bili-transcript",
+  "version": "1.0.2",
+  "description": "提取 B 站视频的文字稿、字幕和 AI 总结。零依赖，扫码登录，纯命令行。",
+  "type": "module",
+  "bin": {
+    "bili-transcript": "src/cli.mjs",
+    "bili": "src/cli.mjs"
+  },
+  "files": [
+    "src/",
+    "SKILL.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "bilibili",
+    "b站",
+    "字幕",
+    "subtitle",
+    "transcript",
+    "cli",
+    "agent-skill",
+    "claude-code",
+    "codex"
+  ],
+  "license": "MIT",
+  "author": "dongliang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dongliang/bili-transcript.git"
+  },
+  "homepage": "https://dongliang.github.io/bili-transcript/",
+  "bugs": {
+    "url": "https://github.com/dongliang/bili-transcript/issues"
+  },
+  "scripts": {
+    "test": "node tests/ci-check.mjs",
+    "doctor": "node src/cli.mjs doctor"
+  },
+  "dependencies": {},
+  "optionalDependencies": {}
+}
