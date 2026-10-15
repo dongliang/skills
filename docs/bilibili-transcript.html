@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bilibili-transcript — 提取 B 站文字稿</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="copy.css">
 <style>
   .term {
     border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
@@ -47,7 +48,7 @@
 </div>
 
 <h2>跑起来是这样</h2>
-<div class="term">
+<div class="term" data-no-copy>
   <div class="term-bar"><i></i><i></i><i></i><span>bilibili-transcript</span></div>
 <pre><span class="ps">$</span> node src/cli.mjs "https://b23.tv/xxxxx" --plain
 <span class="out"># 装上它，AI 编程通过率从 6.7% 涨到 96.7%
@@ -107,5 +108,6 @@ node src/cli.mjs "https://b23.tv/xxxxx" --plain -o out.txt</code></pre>
 </footer>
 
 </div>
+<script src="copy.js"></script>
 </body>
 </html>

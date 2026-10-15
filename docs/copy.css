@@ -1,0 +1,39 @@
+/* 代码块复制按钮：由 copy.js 注入，无 JS 时不显示 */
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 9px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dim);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, color .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 给按钮留出位置，并让长命令换行而不是被裁掉 */
+pre.has-copy {
+  padding-right: 16px;
+  padding-top: 34px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-x: visible;
+}
+.copy-btn { top: 6px; right: 6px; }
+pre:hover .copy-btn,
+.copy-btn:focus-visible { opacity: 1; }
+.copy-btn.done {
+  color: var(--ok);
+  border-color: var(--ok);
+  opacity: 1;
+}
+/* 触屏没有 hover，按钮常驻 */
+@media (hover: none) {
+  .copy-btn { opacity: .75; }
+}
