@@ -92,10 +92,14 @@ node src/cli.mjs doctor
    - 密文前缀是 `v11`——这标记以前专指 Windows App-Bound，但 Linux 上仍是标准方案，别以为要特殊处理
    - 明文**前 32 字节是 `SHA256(host_key)`**，不是 cookie 值的一部分。不去掉长度会多 32 字节
    - 填充是 **PKCS7**。不去掉末尾会多几个字节，nav 接口会报「连不上」，很难查
-8. **读库必须用 `file:...?immutable=1`**。这不是优化：Firefox 运行中时库被锁，直接打开报 `database is locked`。
-9. **Firefox 的 profile 在 `~/.config/mozilla/`，不是 `~/.mozilla/`**（XDG 布局）。且目录名随机，要解析 `profiles.ini` 的 `Default=`。
-10. **字幕接口缺凭据时不抛错**，而是正常返回并带 `need_login_subtitle`。判断「要不要扫码」得看 `noSubtitleReason === 'need-login'`，不是 catch 异常。
-11. **`whoami()` 必须走 `getJson()`**（带凭据）才能问出登录态。手拼 headers 不带 cookie 的话永远返回 null——这个 bug 曾让「已登录」守卫失效。
+8. **读 cookie 库用 `file:...?mode=ro`，不要用 `?immutable=1`**。`immutable=1` 声称「文件不会变」于是跳过 WAL，**静默**读到过期 cookie（刚登录完拿到旧值，最难查）。
+   - **WAL 模式的库必须先复制再读**。SQLite 打开 WAL 库时要在同目录建 `-shm`(32KB) 和 `-wal`，**只读模式也照建**（官方文档承认只读 WAL 库需可写目录）。浏览器运行时这俩文件本就在，直读看不出问题；浏览器干净退出后它们被删了，我们再直读就会凭空留下两个文件——等于偷偷写了用户的浏览器目录。代码里靠读文件头第 18 字节（2 = WAL）判断，WAL 一律复制到 `mkdtemp` 再读，约 45ms。
+   - Chrome 是传统回滚日志（不是 WAL），直读无副作用，走快路径。
+9. **域名过滤不能只靠 SQL 的 `like '%bilibili%'`**，它会放过 `bilibili.com.evil.com`。取到值之后还要按标签边界判一遍，只认 `bilibili.com` / `bilibili.cn` 及其子域。
+10. **Firefox 的 profile 在 `~/.config/mozilla/`，不是 `~/.mozilla/`**（XDG 布局）。且目录名随机，要解析 `profiles.ini` 的 `Default=`。
+11. **字幕接口缺凭据时不抛错**，而是正常返回并带 `need_login_subtitle`。判断「要不要扫码」得看 `noSubtitleReason === 'need-login'`，不是 catch 异常。
+12. **`whoami()` 必须走 `getJson()`**（带凭据）才能问出登录态。手拼 headers 不带 cookie 的话永远返回 null——这个 bug 曾让「已登录」守卫失效。
+13. **临时凭据别写 `/tmp`**。二维码的 `qrcode_key` 能换到登录 cookie，谁先轮询谁拿到账号；二维码图片扫一下就能登录。`/tmp` 全局可读、默认权限 644，写在那儿等于晾给别人看。现放在 `~/.config/bili/` 下并设 0600，登录成功后删掉。
 
 ## 输出给用户时
 

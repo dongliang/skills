@@ -7,7 +7,7 @@
 //   Firefox  —— 明文存在 moz_cookies.value，一条 SQL 搞定
 //   Chromium —— AES-128-CBC，密钥来自桌面密钥环
 import { execFileSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, closeSync, copyFileSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { createDecipheriv, createHash, pbkdf2Sync } from 'node:crypto';
@@ -41,12 +41,37 @@ let _backendName;    // 'node:sqlite' | 'sqlite3'
 let _backendWhy = '';
 
 /**
+ * 判断库是不是 WAL 模式 —— 读文件头第 18 字节（1=传统回滚日志，2=WAL）。
+ *
+ * 为什么非要先问这个：SQLite 打开 WAL 库时必须在同目录建 `-shm`（32KB）和
+ * `-wal`，**只读模式也照建不误**，这是它的设计（官方文档明说只读 WAL 库需要
+ * 可写目录）。浏览器运行时这两个文件本来就在，直读没影响；但浏览器干净退出后
+ * 它们会被删掉，我们再直读就会凭空留下两个文件——等于偷偷写了用户的浏览器目录。
+ * 实测确认过，不是理论风险。
+ */
+function isWal(dbPath) {
+  let fd;
+  try {
+    fd = openSync(dbPath, 'r');
+    const buf = Buffer.alloc(1);
+    return readSync(fd, buf, 0, 1, 18) === 1 && buf[0] === 2;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) try { closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
+/**
  * 打开一个浏览器 cookie 库并跑一条查询。
  *
  * 分两级，因为两个目标会打架：
- *   1) `mode=ro` —— 正确且会带上 WAL 里的最新数据
- *   2) 库被浏览器锁住时（`mode=ro` 直接报 database is locked），退而复制
- *      db + -wal + -shm 三件套到临时目录再读
+ *   1) 直接 `mode=ro` —— 快，且会带上 WAL 里的最新数据
+ *   2) 库被浏览器锁住时（报 database is locked），退而复制 db + -wal + -shm
+ *      三件套到临时目录再读
+ *
+ * WAL 库**一律**走第 2 级：直读会在浏览器目录里留下 -shm/-wal，属于副作用。
+ * 复制一次约 45ms（Firefox 1.5MB 库），且每进程只读一遍，可以接受。
  *
  * ⚠️ 不要用 `?immutable=1` 抄近路。它声称「文件不会变」于是跳过 WAL，
  * 结果是**静默**读到过期数据 —— 实测用户刚登录完，immutable 拿到的是旧值，
@@ -58,9 +83,12 @@ function openAndQuery(dbPath, sql) {
     try { return db.prepare(sql).all(); } finally { db.close(); }
   };
 
-  try {
-    return attempt(`file:${dbPath}?mode=ro`);
-  } catch { /* 多半是被锁了，走复制 */ }
+  // 非 WAL（Chrome 的 rollback journal）直读无副作用，先试这条快路
+  if (!isWal(dbPath)) {
+    try {
+      return attempt(`file:${dbPath}?mode=ro`);
+    } catch { /* 多半是被锁了，走复制 */ }
+  }
 
   const tmp = mkdtempSync(join(tmpdir(), 'bili-ck-'));
   try {
@@ -84,9 +112,11 @@ function openAndQueryCli(dbPath, sql) {
     return t ? JSON.parse(t) : [];
   };
 
-  try {
-    return run(`file:${dbPath}?mode=ro`);
-  } catch { /* 被锁，走复制 */ }
+  if (!isWal(dbPath)) {
+    try {
+      return run(`file:${dbPath}?mode=ro`);
+    } catch { /* 被锁，走复制 */ }
+  }
 
   const tmp = mkdtempSync(join(tmpdir(), 'bili-ck-'));
   try {
@@ -127,11 +157,6 @@ function sqliteReader() {
 export function sqliteBackendName() {
   sqliteReader();
   return _backendName;
-}
-
-export function sqliteUnavailableReason() {
-  sqliteReader();
-  return _backendWhy;
 }
 
 // ---------------------------------------------------------------- 浏览器探测
@@ -224,7 +249,8 @@ function deriveKey(password, len = 16) {
 }
 
 /**
- * 解开一条 Chromium cookie 密文。
+ * 解开一条 Chromium cookie 密文。解不开返回 null，**不抛异常** ——
+ * 调用方要在一堆候选密钥里逐个试，一条解不开不能掐断整轮搜索。
  *
  * 密文布局（v10 / v11 都是这套）：
  *   [3 字节前缀 "v11"][AES-128-CBC 密文]
@@ -235,18 +261,24 @@ function deriveKey(password, len = 16) {
  * 填充必须去掉，否则末尾多几个字节，nav 接口会报「连不上」。
  */
 function decryptChromium(encBuf, key) {
+  if (key.length !== 16) return null;              // aes-128-cbc 只收 16 字节密钥
+
   const prefix = encBuf.subarray(0, 3).toString('latin1');
   if (prefix !== 'v10' && prefix !== 'v11') return null;
 
-  const d = createDecipheriv('aes-128-cbc', key, IV);
-  d.setAutoPadding(false);                       // 手动去填充，顺便能校验
-  const plain = Buffer.concat([d.update(encBuf.subarray(3)), d.final()]);
+  try {
+    const d = createDecipheriv('aes-128-cbc', key, IV);
+    d.setAutoPadding(false);                       // 手动去填充，顺便能校验
+    const plain = Buffer.concat([d.update(encBuf.subarray(3)), d.final()]);
 
-  const pad = plain[plain.length - 1];
-  const body = pad >= 1 && pad <= 16 ? plain.subarray(0, plain.length - pad) : plain;
-  if (body.length < 32) return null;
+    const pad = plain[plain.length - 1];
+    const body = pad >= 1 && pad <= 16 ? plain.subarray(0, plain.length - pad) : plain;
+    if (body.length < 32) return null;
 
-  return { hostHash: body.subarray(0, 32), value: body.subarray(32).toString('utf8') };
+    return { hostHash: body.subarray(0, 32), value: body.subarray(32).toString('utf8') };
+  } catch {
+    return null;    // 密文截断、长度不是 16 的倍数等，都当解不开
+  }
 }
 
 /** 密钥环密码候选：先按 product 精确查，再枚举所有 Safe Storage 兜底 */
@@ -263,11 +295,12 @@ function keyringPasswords(product) {
     push(v);
   } catch { /* 没这条，往下枚举 */ }
 
-  // 2) 枚举兜底 —— 有的浏览器 product name 和目录名对不上
+  // 2) 枚举兜底 —— 有的浏览器 product name 和目录名对不上。
+  //    注意条目头是 `[/18]`（带斜杠），不是 `[18]`，正则漏了斜杠就只切出 1 块。
   try {
     const all = execFileSync('secret-tool', ['search', '--all', 'xdg:schema', KEYRING_SCHEMA],
                              { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1024 * 1024 });
-    for (const block of all.split(/\n(?=\[\d+\])/)) {
+    for (const block of all.split(/\n(?=\[\/?\d+\])/)) {
       const m = block.match(/^secret = (.+)$/m);
       if (m) push(m[1].trim());
     }
@@ -283,13 +316,12 @@ function crackChromiumKey(product, probe) {
     // 但个别版本存的是解码后的字节，两种都试。
     for (const pw of [Buffer.from(secret, 'utf8'), Buffer.from(secret, 'base64')]) {
       if (!pw.length) continue;
-      for (const len of [16, 32]) {
-        const key = deriveKey(pw, len);
-        const got = decryptChromium(Buffer.from(probe.ev, 'hex'), key);
-        if (!got) continue;
-        const want = createHash('sha256').update(probe.host_key).digest();
-        if (got.hostHash.equals(want)) return key;
-      }
+      // 只用 16 字节：Chromium 在 Linux 上就是 AES-128。别顺手加 32 ——
+      // aes-128-cbc 传 32 字节密钥会抛 ERR_CRYPTO_INVALID_KEYLEN。
+      const got = decryptChromium(Buffer.from(probe.ev, 'hex'), deriveKey(pw, 16));
+      if (!got) continue;
+      const want = createHash('sha256').update(probe.host_key).digest();
+      if (got.hostHash.equals(want)) return deriveKey(pw, 16);
     }
   }
   return null;
@@ -299,6 +331,7 @@ function crackChromiumKey(product, probe) {
 
 const NAMES_IN = WANTED.map((n) => `'${n}'`).join(',');
 
+// SQL 里的 like 只是廉价预筛，真正认不认这个域名由 isBilibiliHost() 说了算。
 // 两边的表结构不同：Firefox 只有明文的 value，Chromium 只有密文的 encrypted_value
 const FF_SQL = `select host as host_key, name, value
                   from moz_cookies
@@ -307,41 +340,71 @@ const CR_SQL = `select host_key, name, hex(encrypted_value) as ev
                   from cookies
                  where host_key like '%bilibili%' and name in (${NAMES_IN})`;
 
-/** 一个库里可能有 .bilibili.com / .bilibili.cn 好几份，优先取主域 */
-function pickPreferred(rows) {
+/**
+ * 严格判定是不是 B 站自己的域名。
+ *
+ * SQL 的 `like '%bilibili%'` 会放过 `bilibili.com.evil.com` 这类域，光靠它
+ * 可能把别人的 cookie 当凭据发给 api.bilibili.com。这里按标签边界比：
+ * 只认 bilibili.com / bilibili.cn 及其子域。
+ */
+function isBilibiliHost(host) {
+  const h = String(host || '').replace(/^\./, '').toLowerCase();
+  return h === 'bilibili.com' || h.endsWith('.bilibili.com')
+      || h === 'bilibili.cn'  || h.endsWith('.bilibili.cn');
+}
+
+/** 排序用：越靠前越优先。.bilibili.com 是主域，其他子域次之 */
+function hostRank(host) {
+  const h = String(host || '').replace(/^\./, '').toLowerCase();
+  if (h === 'bilibili.com') return 0;
+  if (h.endsWith('.bilibili.com')) return 1;
+  return 2;
+}
+
+/** 域名先过一遍白名单，再按主域优先取每个字段的第一条 */
+function pickPreferred(rows, getValue) {
   const jar = {};
-  const rank = (h) => (h === '.bilibili.com' ? 0 : h.endsWith('bilibili.com') ? 1 : 2);
-  for (const r of [...rows].sort((a, b) => rank(a.host_key) - rank(b.host_key))) {
-    if (WANTED.includes(r.name) && !jar[r.name] && r.value) jar[r.name] = r.value;
+  const sorted = [...rows].sort((a, b) => hostRank(a.host_key) - hostRank(b.host_key));
+  for (const r of sorted) {
+    if (jar[r.name] || !WANTED.includes(r.name) || !isBilibiliHost(r.host_key)) continue;
+    const v = getValue(r);
+    if (v) jar[r.name] = v;
   }
   return jar;
 }
 
 function readFirefox(b, read) {
   const rows = read(b.dbPath, FF_SQL);
-  return { jar: pickPreferred(rows) };      // Firefox 明文，不用解密
+  // Firefox 明文，值直接取
+  return { jar: pickPreferred(rows, (r) => r.value) };
 }
 
 function readChromium(b, read) {
   const rows = read(b.dbPath, CR_SQL);
   if (!rows.length) return {};
 
-  const probe = rows.find((r) => r.name === 'SESSDATA' && r.ev) || rows.find((r) => r.ev);
-  if (!probe) return {};
+  // 拿一条密文当探针试密钥。优先 SESSDATA，但它要是正好损坏了，
+  // 换别的行再试 —— 否则「密钥没问题、只是这一条坏了」会被误判成「取不到密钥环」。
+  const probes = [
+    ...rows.filter((r) => r.name === 'SESSDATA' && r.ev),
+    ...rows.filter((r) => r.ev),
+  ];
 
-  const cracked = crackChromiumKey(b.product, probe);
+  let cracked = null;
+  for (const p of probes) {
+    cracked = crackChromiumKey(b.product, p);
+    if (cracked) break;
+  }
   if (!cracked) return { needKeyring: true };
 
-  const jar = {};
-  const rank = (h) => (h === '.bilibili.com' ? 0 : h.endsWith('bilibili.com') ? 1 : 2);
-  for (const r of [...rows].sort((a, b2) => rank(a.host_key) - rank(b2.host_key))) {
-    if (!r.ev || jar[r.name]) continue;
+  // 解出来还要拿 SHA256(host_key) 自证，解错的行当没有
+  const jar = pickPreferred(rows, (r) => {
+    if (!r.ev) return null;
     const got = decryptChromium(Buffer.from(r.ev, 'hex'), cracked);
-    if (!got || !got.value) continue;
+    if (!got || !got.value) return null;
     const want = createHash('sha256').update(r.host_key).digest();
-    if (!got.hostHash.equals(want)) continue;      // 解错了就丢，别给脏数据
-    jar[r.name] = got.value;
-  }
+    return got.hostHash.equals(want) ? got.value : null;
+  });
   return jar.SESSDATA ? { jar } : {};
 }
 
@@ -384,12 +447,20 @@ export function probeBrowsers() {
   const read = sqliteReader();
   if (!read) return { found, readable: false, reason: _backendWhy, hit: null };
 
+  const keyringMisses = [];
   for (const b of found) {
     try {
       const r = b.kind === 'firefox' ? readFirefox(b, read) : readChromium(b, read);
       if (r && r.jar && r.jar.SESSDATA) return { found, readable: true, hit: b, reason: null };
-      if (r && r.needKeyring) return { found, readable: true, hit: null, reason: `${b.name}：取不到密钥环密码（缺 secret-tool 或未解锁）` };
+      // 别在这里 return —— 后面还有别的浏览器，可能那个才有登录态
+      if (r && r.needKeyring) keyringMisses.push(b.name);
     } catch { /* 继续看下一个 */ }
+  }
+  if (keyringMisses.length) {
+    return {
+      found, readable: true, hit: null,
+      reason: `${keyringMisses.join('、')}：取不到密钥环密码（缺 secret-tool 或未解锁）`,
+    };
   }
   return { found, readable: true, hit: null, reason: found.length ? '浏览器里没有 B 站登录态' : null };
 }

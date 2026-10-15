@@ -1,4 +1,4 @@
-import { writeFileSync as _wfs } from 'node:fs';
+import { writeFileSync as _wfs, chmodSync as _chmod } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 // 纯 JS 二维码编码器 —— 零依赖
 // 支持：字节模式、纠错等级 M、版本 1–10、自动选版本、掩码自动择优
@@ -379,7 +379,9 @@ export function writePNG(matrix, path, { scale = 8, quiet = 4 } = {}) {
     chunk('IDAT', deflateSync(raw, { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ]);
-  _wfs(path, png);
+  // 0600：这张图扫一下就能登录，不该让同机其他人读到
+  _wfs(path, png, { mode: 0o600 });
+  try { _chmod(path, 0o600); } catch { /* 有的文件系统不支持，忽略 */ }
   return { width: w, height: h, bytes: png.length };
 }
 

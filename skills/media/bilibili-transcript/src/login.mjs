@@ -1,12 +1,17 @@
 // 扫码登录 —— 纯命令行，不需要任何浏览器
-import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, unlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { encodeQR, renderText, writePNG } from './qr.mjs';
 import { UA, API, getJson } from './api.mjs';
 import { saveAuth, AUTH_PATH } from './auth.mjs';
 
 const H = { 'User-Agent': UA, Referer: 'https://www.bilibili.com/' };
 const QRAPI = 'https://passport.bilibili.com/x/passport-login/web/qrcode';
-const KEYFILE = '/tmp/bili_qr.json';
+
+// 放在用户目录而不是 /tmp：这个 key 能换到登录 cookie，谁先轮询谁拿到账号。
+// /tmp 是全局可读的，写在那儿等于把凭据晾给别人看（实测默认权限 644）。
+const KEYFILE = join(homedir(), '.config', 'bili', 'qr-pending.json');
 
 /** 读 cookie 头。不同 Node 构建行为不一致：getSetCookie() 可能不存在，get() 可能返回数组 */
 function readSetCookies(resp) {
@@ -65,7 +70,9 @@ export async function login({ png = null, qrOnly = false, resume = false, timeou
   }
 
   if (qrOnly) {
-    writeFileSync(KEYFILE, JSON.stringify({ url, key, ts: Date.now() }) + '\n');
+    mkdirSync(dirname(KEYFILE), { recursive: true });
+    writeFileSync(KEYFILE, JSON.stringify({ url, key, ts: Date.now() }) + '\n', { mode: 0o600 });
+    try { chmodSync(KEYFILE, 0o600); } catch { /* 有的文件系统不支持，忽略 */ }
     log(`已保存二维码到 ${KEYFILE}。给用户看完后用 --resume 继续轮询。`);
     return { qrOnly: true, url, key, png };
   }
@@ -104,6 +111,8 @@ export async function login({ png = null, qrOnly = false, resume = false, timeou
   if (!jar.SESSDATA) throw new Error('超时，或没能拿到凭据。请重试。');
 
   saveAuth(jar);
+  // 登录成了就把待用 key 删掉，不留在盘上
+  if (resume) try { unlinkSync(KEYFILE); } catch { /* 已经没了就算了 */ }
   const who = await whoami().catch(() => null);
 
   log('\n=== 登录成功 ===');
