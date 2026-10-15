@@ -99,7 +99,7 @@ export function renderText(v, { plain = false, list = false } = {}) {
   out.push(`UP: ${v.uploader} | 时长 ${v.duration}s | ${v.url}`);
 
   if (v.noSubtitleReason === 'need-login') {
-    out.push('\n[字幕接口要求登录：当前无有效凭据，拿不到字幕轨。运行 `bili login` 扫码登录]');
+    out.push('\n[字幕接口要求登录：环境变量、auth.json、浏览器 cookie 里都没找到凭据。运行 `bili login` 扫码登录]');
   } else if (v.noSubtitleReason === 'none-available') {
     out.push('\n[该视频没有字幕轨。纯音乐 / MV / CG 类视频通常没有。可加 --summary 试试 B 站的 AI 总结。]');
   }

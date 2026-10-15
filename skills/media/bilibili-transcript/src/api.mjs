@@ -1,6 +1,6 @@
 // B 站接口封装 —— wbi 签名、请求、错误处理
 import { createHash } from 'node:crypto';
-import { findSessdata } from './auth.mjs';
+import { findCredentials, cookieHeader } from './auth.mjs';
 
 export const API = 'https://api.bilibili.com';
 export const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -13,8 +13,8 @@ const MIXIN_TAB = [
 
 export function headers() {
   const h = { 'User-Agent': UA, Referer: 'https://www.bilibili.com/' };
-  const { value } = findSessdata();
-  if (value) h.Cookie = 'SESSDATA=' + value;
+  const cookie = cookieHeader(findCredentials().jar);
+  if (cookie) h.Cookie = cookie;
   return h;
 }
 

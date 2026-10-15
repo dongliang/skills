@@ -1,6 +1,7 @@
 // 自检 —— 一眼分清「接口变了」还是「该重新登录了」
 import { API, getJson, wbiQuery, headers } from './api.mjs';
 import { findSessdata, AUTH_PATH } from './auth.mjs';
+import { probeBrowsers, sqliteBackendName } from './browser.mjs';
 
 const R = { pass: 0, fail: 0, warn: 0 };
 const ok = (m) => { R.pass++; console.log(`  ✅ ${m}`); };
@@ -19,6 +20,19 @@ export async function runDoctor({ json = false } = {}) {
   const { value: sd, source } = findSessdata();
   if (sd) ok(`SESSDATA 长度 ${sd.length}，来自 ${source}`);
   else bad(`找不到凭据。运行 \`bili login\` 扫码登录（默认位置 ${AUTH_PATH}）`);
+
+  log('\n== 浏览器 ==');
+  const bp = probeBrowsers();
+  const backend = sqliteBackendName();
+  if (!backend) {
+    soft(`读不了浏览器 cookie 库：${bp.reason}`);
+  } else {
+    const list = bp.found.map((b) => `${b.name}（${b.profile}）`).join('、');
+    if (bp.hit) ok(`${bp.hit.name}（${bp.hit.profile}）—— 已从中取到凭据`);
+    else if (bp.reason) soft(`${bp.reason}${list ? `（找到 ${list}）` : ''}`);
+    else if (list) soft(`找到 ${list}，但没有 B 站登录态`);
+    else soft('本机没找到浏览器 cookie 库');
+  }
 
   if (sd) {
     log('\n== 凭据可用性 ==');

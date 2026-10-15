@@ -1,8 +1,8 @@
 // 扫码登录 —— 纯命令行，不需要任何浏览器
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { encodeQR, renderText, writePNG } from './qr.mjs';
-import { UA, API } from './api.mjs';
-import { saveAuth, AUTH_PATH, findSessdata } from './auth.mjs';
+import { UA, API, getJson } from './api.mjs';
+import { saveAuth, AUTH_PATH } from './auth.mjs';
 
 const H = { 'User-Agent': UA, Referer: 'https://www.bilibili.com/' };
 const QRAPI = 'https://passport.bilibili.com/x/passport-login/web/qrcode';
@@ -20,9 +20,10 @@ function readSetCookies(resp) {
   return raw ? [raw] : [];
 }
 
+/** 当前登录的是谁。走 getJson 才能带上凭据 —— 手拼 H 的话永远问不出登录态 */
 export async function whoami() {
-  const nav = await (await fetch(`${API}/x/web-interface/nav`, { headers: H })).json();
-  return nav.data?.isLogin ? nav.data : null;
+  const nav = await getJson(`${API}/x/web-interface/nav`).catch(() => null);
+  return nav?.data?.isLogin ? nav.data : null;
 }
 
 export async function login({ png = null, qrOnly = false, resume = false, timeout = 180, force = false, log = console.log }) {
