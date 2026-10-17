@@ -30,10 +30,10 @@ sh skills/visual/pixelfig/scripts/install-fonts.sh
 ## 关于 bilibili-transcript
 
 ```bash
-node src/cli.mjs "https://b23.tv/xxxxx" --plain
+npx -y bili-transcript@latest "https://b23.tv/xxxxx" --plain
 ```
 
-支持短链、合集分P、B 站官方 AI 总结。技能自带脚本，零 npm 依赖，装完即用。要登录（B 站字幕接口强制），扫码一次即可。也发在 [npm](https://www.npmjs.com/package/bili-transcript) 上。
+支持短链、合集分P、B 站官方 AI 总结。这是个独立的 [npm 包](https://www.npmjs.com/package/bili-transcript)，技能里只放调用说明，不放代码——想装到全局就 `npm i -g bili-transcript`。要登录（B 站字幕接口强制），浏览器里已登录 B 站时会自动读取，否则扫码一次。
 
 ## 校验
 

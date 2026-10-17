@@ -39,18 +39,18 @@
 <header>
   <h1>把 B 站视频<br>变成<span class="mark">能读的文字</span></h1>
   <p class="lede">字幕、文字稿、AI 总结，一条命令拿走。</p>
-  <p class="lede">技能自带脚本 · 零 npm 依赖 · 扫码登录</p>
+  <p class="lede">npm 包 · 浏览器登录态自动读取 · 零依赖</p>
 </header>
 
 <div class="install">
 <pre><code><span class="k">npx</span> skills@latest add dongliang/skills --skill bilibili-transcript</code></pre>
-<p class="dim" style="font-size:14px">装完即用，脚本随技能一起来，不需要再装别的东西。</p>
+<p class="dim" style="font-size:14px">技能里只有调用说明，命令走 <code>npx</code>。想装到全局：<code>npm i -g bili-transcript</code>。</p>
 </div>
 
 <h2>跑起来是这样</h2>
 <div class="term" data-no-copy>
   <div class="term-bar"><i></i><i></i><i></i><span>bilibili-transcript</span></div>
-<pre><span class="ps">$</span> node src/cli.mjs "https://b23.tv/xxxxx" --plain
+<pre><span class="ps">$</span> bili "https://b23.tv/xxxxx" --plain
 <span class="out"># 装上它，AI 编程通过率从 6.7% 涨到 96.7%
 UP: 某 UP 主 | 时长 1159s
 
@@ -59,7 +59,7 @@ UP: 某 UP 主 | 时长 1159s
 2025年有一款AI agent让全世界都吃了一惊
 他发布几个小时服务器就被挤爆
 ...</span>
-<span class="ps">$</span> node src/cli.mjs BV1xx411c7mD --plain -o out.txt
+<span class="ps">$</span> bili BV1xx411c7mD --plain -o out.txt
 <span class="out">已写入 out.txt（5618 字符）</span></pre>
 </div>
 
@@ -73,15 +73,15 @@ UP: 某 UP 主 | 时长 1159s
 </ul>
 
 <h2>三步开始</h2>
-<pre><code><span class="c"># 1. 登一次，以后不用再登（扫码）</span>
-node src/cli.mjs login
+<pre><code><span class="c"># 1. 登录：浏览器里已登录 B 站会自动读，否则扫码</span>
+bili login
 
 <span class="c"># 2. 提取文字稿</span>
-node src/cli.mjs BV1xx411c7mD --plain
+bili BV1xx411c7mD --plain
 
 <span class="c"># 3. 长视频写进文件再看</span>
-node src/cli.mjs "https://b23.tv/xxxxx" --plain -o out.txt</code></pre>
-<p class="dim">出问题了先跑 <code>node src/cli.mjs doctor</code>，它分得清是接口变了、凭据过期了还是环境有问题。</p>
+bili "https://b23.tv/xxxxx" --plain -o out.txt</code></pre>
+<p class="dim">出问题了先跑 <code>bili doctor</code>，它分得清是接口变了、凭据过期了还是环境有问题。</p>
 
 <h2>命令一览</h2>
 <table>
